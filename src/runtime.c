@@ -524,6 +524,10 @@ app_lcore_main_loop_io(void)
 			app_lcore_io_rx(lp, n_workers, bsz_rx_rd, bsz_rx_wr, pos_lb); 
 		}
 
+		if (likely(lp->tx.n_nic_ports > 0)) {
+			app_lcore_io_tx(lp, n_workers, app.burst_size_io_tx_read, app.burst_size_io_tx_write); 
+		}
+
 		i ++;
 	}
 }
