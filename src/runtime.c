@@ -191,6 +191,8 @@ app_lcore_io_rx(
 	uint8_t *data_1_0, *data_1_1 = NULL;
 	uint32_t i;
 
+	static uint32_t counter;
+
 	for (i = 0; i < lp->rx.n_nic_queues; i ++) {
 		uint8_t port = lp->rx.nic_queues[i].port;
 		uint8_t queue = lp->rx.nic_queues[i].queue;
@@ -206,7 +208,10 @@ app_lcore_io_rx(
 			continue;
 		}
 
-		printf("Latency %lu ns\n",hptl_get()-(*(hptl_t*)(rte_ctrlmbuf_data(lp->rx.mbuf_in.array[0])+90)));
+		if(++counter>APP_STATS){
+			printf("Latency %lu ns\n",hptl_get()-(*(hptl_t*)(rte_ctrlmbuf_data(lp->rx.mbuf_in.array[n_mbufs-1])+90)));
+			counter =0;
+		}
 
 #if APP_STATS
 		lp->rx.nic_queues_iters[i] ++;
@@ -436,26 +441,6 @@ app_lcore_io_tx(
 				0,
 				&tmpbuf,
 				1);
-
-#if APP_STATS
-			lp->tx.nic_ports_iters[port] ++;
-			lp->tx.nic_ports_count[port] += n_pkts;
-			if (unlikely(lp->tx.nic_ports_iters[port] == APP_STATS)) {
-				struct rte_eth_stats stats;
-				unsigned lcore = rte_lcore_id();
-
-				rte_eth_stats_get(port, &stats);
-
-				printf("\t\t\tI/O TX %u out (port %u): NIC drop ratio = %.2f (%u/%u) avg burst size = %.2f\n",
-					lcore,
-					(unsigned) port,
-					(double) stats.oerrors / (double) (stats.oerrors + stats.opackets),
-					(uint32_t) stats.opackets, (uint32_t) stats.oerrors,
-					((double) lp->tx.nic_ports_count[port]) / ((double) lp->tx.nic_ports_iters[port]));
-				lp->tx.nic_ports_iters[port] = 0;
-				lp->tx.nic_ports_count[port] = 0;
-			}
-#endif
 
 			if (unlikely(n_pkts < n_mbufs)) {
 				uint32_t k;
