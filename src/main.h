@@ -35,6 +35,7 @@
 #define _MAIN_H_
 
 #include <stdio.h>
+#include "hptl.h"
 
 /* Logical cores */
 #ifndef APP_MAX_SOCKETS

@@ -379,17 +379,32 @@ app_lcore_io_tx(
 {
 	uint32_t worker;
 
+	const uint8_t icmppkt []={
+	0x00, 0x1e, 0x4a, 0xe0, 0x52, 0x00, 0x14, 0xdd, 0xa9, 0xd2, 0xef, 0x57, 0x08, 0x00, 0x45, 0x00,
+	0x00, 0x54, 0x51, 0x36, 0x40, 0x00, 0x40, 0x01, 0x6b, 0xee, 0x96, 0xf4, 0x3a, 0x72, 0xd8, 0x3a,
+	0xd3, 0xe3, 0x08, 0x00, 0xeb, 0xe1, 0x66, 0x02, 0x00, 0x1a, 0x67, 0x72, 0x97, 0x57, 0x00, 0x00,
+	0x00, 0x00, 0xe4, 0x64, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
+	0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25,
+	0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
+	0x36, 0x37
+	};
+	const int icmppktlen = 98;
+
 	for (worker = 0; worker < n_workers; worker ++) {
 		uint32_t i;
 
 		for (i = 0; i < lp->tx.n_nic_ports; i ++) {
 			uint8_t port = lp->tx.nic_ports[i];
-			struct rte_ring *ring = lp->tx.rings[port][worker];
+			//struct rte_ring *ring = lp->tx.rings[port][worker];
 			uint32_t n_mbufs, n_pkts;
-			int ret;
+			//int ret;
+
+			//UNUSED -> uncoment :)
+			(void)bsz_rd;
+			(void)bsz_wr;
 
 			n_mbufs = lp->tx.mbuf_out[port].n_mbufs;
-			ret = rte_ring_sc_dequeue_bulk(
+			/*ret = rte_ring_sc_dequeue_bulk(
 				ring,
 				(void **) &lp->tx.mbuf_out[port].array[n_mbufs],
 				bsz_rd);
@@ -398,32 +413,19 @@ app_lcore_io_tx(
 				continue;
 			}
 
-			n_mbufs += bsz_rd;
+			n_mbufs += bsz_rd;*/
 
-#if APP_IO_TX_DROP_ALL_PACKETS
-			{
-				uint32_t j;
-				APP_IO_TX_PREFETCH0(lp->tx.mbuf_out[port].array[0]);
-				APP_IO_TX_PREFETCH0(lp->tx.mbuf_out[port].array[1]);
+			lp->tx.mbuf_out[port].array[0]=rte_pktmbuf_alloc (app.pools[0]);
+			n_mbufs=1;
+			lp->tx.mbuf_out[port].array[0]->pkt_len = icmppktlen;
+			
+			memcpy(lp->tx.mbuf_out[port].array[0]->buf_addr,icmppkt,icmppktlen);
 
-				for (j = 0; j < n_mbufs; j ++) {
-					if (likely(j < n_mbufs - 2)) {
-						APP_IO_TX_PREFETCH0(lp->tx.mbuf_out[port].array[j + 2]);
-					}
 
-					rte_pktmbuf_free(lp->tx.mbuf_out[port].array[j]);
-				}
-
-				lp->tx.mbuf_out[port].n_mbufs = 0;
-
-				continue;
-			}
-#endif
-
-			if (unlikely(n_mbufs < bsz_wr)) {
+			/*if (unlikely(n_mbufs < bsz_wr)) {
 				lp->tx.mbuf_out[port].n_mbufs = n_mbufs;
 				continue;
-			}
+			}*/
 
 			n_pkts = rte_eth_tx_burst(
 				port,

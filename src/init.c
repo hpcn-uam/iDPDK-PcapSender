@@ -502,5 +502,12 @@ app_init(void)
 	app_init_rings_tx();
 	app_init_nics();
 
+	//HPTL
+	hptl_config conf = {
+		.clockspeed=0,
+		.precision=9
+	};
+	hptl_init(&conf);
+
 	printf("Initialization completed.\n");
 }
