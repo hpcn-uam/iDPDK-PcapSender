@@ -206,6 +206,8 @@ app_lcore_io_rx(
 			continue;
 		}
 
+		printf("Latency %lu ns\n",hptl_get()-(*(hptl_t*)(rte_ctrlmbuf_data(lp->rx.mbuf_in.array[0])+90)));
+
 #if APP_STATS
 		lp->rx.nic_queues_iters[i] ++;
 		lp->rx.nic_queues_count[i] += n_mbufs;
@@ -434,8 +436,6 @@ app_lcore_io_tx(
 				0,
 				&tmpbuf,
 				1);
-
-			printf("Tx sent %d\n",n_pkts);
 
 #if APP_STATS
 			lp->tx.nic_ports_iters[port] ++;
