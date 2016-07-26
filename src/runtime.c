@@ -414,19 +414,15 @@ app_lcore_io_tx(
 			}
 
 			n_mbufs += bsz_rd;*/
-			if(rte_pktmbuf_alloc_bulk (app.pools[0],lp->tx.mbuf_out[port].array,bsz_wr))
-				printf("Alloc error\n");
 
-			for (n_mbufs=0;n_mbufs<bsz_wr;n_mbufs++)
-			{
-				struct rte_mbuf * tmpbuf = lp->tx.mbuf_out[port].array[n_mbufs];
-				tmpbuf->pkt_len = icmppktlen;
-				tmpbuf->data_len = icmppktlen;
-				tmpbuf->port = port;
-				//tmpbuf->seqn = seqnum;
-				
-				memcpy((uint8_t *)tmpbuf->buf_addr + tmpbuf->data_off,icmppkt,icmppktlen);
-			}
+			n_mbufs = 1;
+
+			struct rte_mbuf * tmpbuf = rte_ctrlmbuf_alloc(app.pools[0]) ;
+			tmpbuf->pkt_len = icmppktlen;
+			tmpbuf->data_len = icmppktlen;
+			tmpbuf->port = port;
+			memcpy(rte_ctrlmbuf_data(tmpbuf),icmppkt,icmppktlen);
+			*((hptl_t*)(rte_ctrlmbuf_data(tmpbuf)+icmppktlen-8)) = hptl_get();
 
 			/*if (unlikely(n_mbufs < bsz_wr)) {
 				lp->tx.mbuf_out[port].n_mbufs = n_mbufs;
@@ -436,8 +432,8 @@ app_lcore_io_tx(
 			n_pkts = rte_eth_tx_burst(
 				port,
 				0,
-				lp->tx.mbuf_out[port].array,
-				(uint16_t) n_mbufs);
+				&tmpbuf,
+				1);
 
 			printf("Tx sent %d\n",n_pkts);
 
