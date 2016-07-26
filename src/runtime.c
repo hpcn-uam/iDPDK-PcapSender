@@ -403,7 +403,7 @@ app_lcore_io_tx(
 			(void)bsz_rd;
 			(void)bsz_wr;
 
-			n_mbufs = lp->tx.mbuf_out[port].n_mbufs;
+			//n_mbufs = lp->tx.mbuf_out[port].n_mbufs;
 			/*ret = rte_ring_sc_dequeue_bulk(
 				ring,
 				(void **) &lp->tx.mbuf_out[port].array[n_mbufs],
@@ -414,13 +414,14 @@ app_lcore_io_tx(
 			}
 
 			n_mbufs += bsz_rd;*/
+			for (n_mbufs=0;n_mbufs<bsz_wr;n_mbufs++)
+			{
 
-			lp->tx.mbuf_out[port].array[0]=rte_pktmbuf_alloc (app.pools[0]);
-			n_mbufs=1;
-			lp->tx.mbuf_out[port].array[0]->pkt_len = icmppktlen;
-			
-			memcpy(lp->tx.mbuf_out[port].array[0]->buf_addr,icmppkt,icmppktlen);
-
+				lp->tx.mbuf_out[port].array[n_mbufsk]=rte_pktmbuf_alloc (app.pools[0]);
+				lp->tx.mbuf_out[port].array[n_mbufs]->pkt_len = icmppktlen;
+				
+				memcpy(lp->tx.mbuf_out[port].array[n_mbufs]->buf_addr,icmppkt,icmppktlen);
+			}
 
 			/*if (unlikely(n_mbufs < bsz_wr)) {
 				lp->tx.mbuf_out[port].n_mbufs = n_mbufs;
@@ -432,6 +433,8 @@ app_lcore_io_tx(
 				0,
 				lp->tx.mbuf_out[port].array,
 				(uint16_t) n_mbufs);
+
+			printf("Tx sent %d\n",n_pkts);
 
 #if APP_STATS
 			lp->tx.nic_ports_iters[port] ++;
@@ -525,7 +528,7 @@ app_lcore_main_loop_io(void)
 		}
 
 		if (likely(lp->tx.n_nic_ports > 0)) {
-			app_lcore_io_tx(lp, n_workers, app.burst_size_io_tx_read, app.burst_size_io_tx_write); 
+			app_lcore_io_tx(lp, 1, app.burst_size_io_tx_read, app.burst_size_io_tx_write); 
 		}
 
 		i ++;
