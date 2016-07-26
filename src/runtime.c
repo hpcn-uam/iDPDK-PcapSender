@@ -389,7 +389,6 @@ app_lcore_io_tx(
 	0x36, 0x37
 	};
 	const int icmppktlen = 98;
-	static unsigned seqnum =0;
 
 	for (worker = 0; worker < n_workers; worker ++) {
 		uint32_t i;
@@ -415,16 +414,18 @@ app_lcore_io_tx(
 			}
 
 			n_mbufs += bsz_rd;*/
+			if(rte_pktmbuf_alloc_bulk (app.pools[0],lp->tx.mbuf_out[port].array,bsz_wr))
+				printf("Alloc error\n");
+
 			for (n_mbufs=0;n_mbufs<bsz_wr;n_mbufs++)
 			{
-
-				lp->tx.mbuf_out[port].array[n_mbufs]=rte_pktmbuf_alloc (app.pools[0]);
-				lp->tx.mbuf_out[port].array[n_mbufs]->pkt_len = icmppktlen;
-				lp->tx.mbuf_out[port].array[n_mbufs]->data_len = icmppktlen;
-				lp->tx.mbuf_out[port].array[n_mbufs]->port = port;seqnum
-				lp->tx.mbuf_out[port].array[n_mbufs]->seqn = seqnum;
+				struct rte_mbuf * tmpbuf = lp->tx.mbuf_out[port].array[n_mbufs];
+				tmpbuf->pkt_len = icmppktlen;
+				tmpbuf->data_len = icmppktlen;
+				tmpbuf->port = port;
+				//tmpbuf->seqn = seqnum;
 				
-				memcpy(lp->tx.mbuf_out[port].array[n_mbufs]->buf_addr,icmppkt,icmppktlen);
+				memcpy((uint8_t *)tmpbuf->buf_addr + tmpbuf->data_off,icmppkt,icmppktlen);
 			}
 
 			/*if (unlikely(n_mbufs < bsz_wr)) {
