@@ -1,9 +1,9 @@
-High Speed Speedometer using Intel DPDK
+High Speed Latency-Metter using Intel DPDK
 =================
 
-Intel Data Plane Development Kit (DPDK) Speedometer (Bandwidth consumed monitor) 
+Intel Data Plane Development Kit (DPDK) LatencyMetter
 
-This program allows to measure the bandwith consumed on an interface and counts the number of packets per second.
+This program allows to measure the Latency.
 
 
 Compilation
