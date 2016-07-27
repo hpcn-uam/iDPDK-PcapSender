@@ -36,6 +36,7 @@
 
 #include <stdio.h>
 #include "hptl.h"
+#include "pcap_jose.h"
 
 /* Logical cores */
 #ifndef APP_MAX_SOCKETS
@@ -250,8 +251,6 @@ struct app_lcore_params_io {
 		} nic_queues[APP_MAX_NIC_RX_QUEUES_PER_IO_LCORE];
 		uint32_t n_nic_queues;
 
-		FILE * record;
-
 		/* Rings */
 		struct rte_ring *rings[APP_MAX_WORKER_LCORES];
 		uint32_t n_rings;
@@ -283,6 +282,10 @@ struct app_lcore_params_io {
 		/* Internal buffers */
 		struct app_mbuf_array mbuf_out[APP_MAX_NIC_TX_PORTS_PER_IO_LCORE];
 		uint8_t mbuf_out_flush[APP_MAX_NIC_TX_PORTS_PER_IO_LCORE];
+
+		uint8_t * pcapfile_start;
+		uint8_t * pcapfile_cur;
+		uint8_t * pcapfile_end;
 
 		/* Stats */
 		uint32_t rings_count[APP_MAX_NIC_PORTS][APP_MAX_WORKER_LCORES];

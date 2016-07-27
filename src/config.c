@@ -85,7 +85,7 @@ static const char usage[] =
 "           handled by the I/O RX lcores                                        \n"
 "    --tx \"(PORT, LCORE), ...\" : List of NIC TX ports handled by the I/O TX   \n"
 "           lcores                                                              \n"
-"    --w \"LCORE, ...\" : List of the worker lcores                             \n"
+"    --pcap \"file.pcap\" : the pcap file to send   \n"
 
 "                                                                               \n"
 "Application optional parameters:                                               \n"
@@ -110,10 +110,7 @@ static const char usage[] =
 "               is %u)                                                          \n"
 "           E = I/O TX lcore read burst size from input SW rings (default value \n"
 "               is %u)                                                          \n"
-"           F = I/O TX lcore write burst size to NIC TX (default value is %u)   \n"
-"    --pos-lb POS : Position of the 1-byte field within the input packet used by\n"
-"           the I/O RX lcores to identify the worker lcore for the current      \n"
-"           packet (default value is %u)                                        \n";
+"           F = I/O TX lcore write burst size to NIC TX (default value is %u)   \n";
 
 void
 app_print_usage(void)
@@ -128,8 +125,7 @@ app_print_usage(void)
 		APP_DEFAULT_BURST_SIZE_WORKER_READ,
 		APP_DEFAULT_BURST_SIZE_WORKER_WRITE,
 		APP_DEFAULT_BURST_SIZE_IO_TX_READ,
-		APP_DEFAULT_BURST_SIZE_IO_TX_WRITE,
-		APP_DEFAULT_IO_RX_LB_POS
+		APP_DEFAULT_BURST_SIZE_IO_TX_WRITE
 	);
 }
 
@@ -517,7 +513,7 @@ parse_arg_pos_lb(const char *arg)
 	return 0;
 }
 
-extern char record_File [256];
+extern char pcap_File [256];
 
 /* Parse the argument given in the command line of the application */
 int
@@ -529,13 +525,12 @@ app_parse_args(int argc, char **argv)
 	char *prgname = argv[0];
 	static struct option lgopts[] = {
 		//aniadido
-		{"record", 1, 0, 0},
+		{"pcap", 1, 0, 0},
 		//normal
 		{"rx", 1, 0, 0},
 		{"tx", 1, 0, 0},
 		{"rsz", 1, 0, 0},
 		{"bsz", 1, 0, 0},
-		{"pos-lb", 1, 0, 0},
 		{NULL, 0, 0, 0}
 	};
 	uint32_t arg_rx = 0;
@@ -575,9 +570,9 @@ app_parse_args(int argc, char **argv)
 					return -1;
 				}
 			}
-			if (!strcmp(lgopts[option_index].name, "record")) {
-				strcpy(record_File,optarg);
-				printf("Record value set to %s\n", record_File);					
+			if (!strcmp(lgopts[option_index].name, "pcap")) {
+				strcpy(pcap_File,optarg);
+				printf("Pcap file set to %s\n", pcap_File);					
 			}
 			if (!strcmp(lgopts[option_index].name, "rsz")) {
 				arg_rsz = 1;

@@ -1,9 +1,9 @@
-High Speed Latency-Metter using Intel DPDK
+High Speed Pcap-sender using Intel DPDK
 =================
 
-Intel Data Plane Development Kit (DPDK) LatencyMetter
+Intel Data Plane Development Kit (DPDK) Pcap-Sender
 
-This program allows to measure the Latency.
+This program allows to send PCAPS preloaded in memory (much biggers than pktgen does ;)).
 
 
 Compilation
@@ -16,6 +16,4 @@ The script *setup.sh* can be used to compile everything. Feel free to modify the
 
 Execution
 =================
-There are many test.sh for different (but quite similar) scenarios. All of them wrote the information on the screen using stdout.
-If we want to save that into an ordered log, we can use the "record.sh" scripts.
-There are no limit on how many interfaces can be measured at a time. The program just have to be configured/lunched as any DPDK app.
+The script provided can send a PCAP throught only one interface. Future improvements will allow to send to more ports

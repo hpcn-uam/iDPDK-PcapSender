@@ -36,6 +36,9 @@
 #include <stdint.h>
 #include <inttypes.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
 #include <string.h>
 #include <sys/queue.h>
 #include <stdarg.h>
@@ -174,13 +177,12 @@ app_init_mbuf_pools(void)
 	}
 }
 
-char record_File [256]={0};
+char pcap_File [256]={0};
 
 static void
 app_init_rings_rx(void)
 {
 	unsigned lcore;
-	char record_File_tmp [512];
 
 	/* Initialize the rings for the RX side */
 	for (lcore = 0; lcore < APP_MAX_LCORES; lcore ++) {
@@ -192,20 +194,38 @@ app_init_rings_rx(void)
 			continue;
 		}
 
-		if(record_File[0])
+		int fd = open(pcap_File, O_RDONLY);
+
+		if(fd == -1)
 		{
-			gettimeofday(&lp_io->rx.end_ewr, NULL);
-			sprintf(record_File_tmp,"%s/TimeSeries_Port%d_%lu.txt",record_File,lp_io->rx.nic_queues[0].port,lp_io->rx.end_ewr.tv_sec);
-			lp_io->rx.record=fopen(record_File_tmp,"w+");
-			if(lp_io->rx.record==NULL)
-			{
-				perror("record file");
-				exit(-1);
-			}
-		}else
-		{
-			lp_io->rx.record=NULL;
+			perror("pcap file");
+			exit(-1);
 		}
+
+			struct stat sb;
+
+		if (fstat(fd, &sb) == -1) {
+			perror("pcap file size unknown");
+			exit(-1);
+		}
+		
+		fprintf(stderr, "Preloading file...");
+		fflush(stderr);
+
+		lp_io->tx.pcapfile_start = mmap(NULL, sb.st_size, PROT_READ,
+						MAP_PRIVATE | MAP_POPULATE, fd, 0);
+
+		if (lp_io->tx.pcapfile_start == MAP_FAILED) {
+			perror("mmap failed");
+			exit(-1);
+		}
+
+		fprintf(stderr, "Done!\n");
+		fflush(stderr);
+
+		lp_io->tx.pcapfile_end    = lp_io->tx.pcapfile_start + sb.st_size;
+		lp_io->tx.pcapfile_start += sizeof(pcap_hdr_tJZ);
+		lp_io->tx.pcapfile_cur = lp_io->tx.pcapfile_start;
 
 		socket_io = rte_lcore_to_socket_id(lcore);
 

@@ -191,8 +191,6 @@ app_lcore_io_rx(
 	uint8_t *data_1_0, *data_1_1 = NULL;
 	uint32_t i;
 
-	static uint32_t counter;
-
 	for (i = 0; i < lp->rx.n_nic_queues; i ++) {
 		uint8_t port = lp->rx.nic_queues[i].port;
 		uint8_t queue = lp->rx.nic_queues[i].queue;
@@ -207,71 +205,6 @@ app_lcore_io_rx(
 		if (unlikely(n_mbufs == 0)) {
 			continue;
 		}
-
-		if(++counter>APP_STATS){
-			printf("Latency %lu ns\n",hptl_get()-(*(hptl_t*)(rte_ctrlmbuf_data(lp->rx.mbuf_in.array[n_mbufs-1])+90)));
-			counter =0;
-		}
-
-#if APP_STATS
-		lp->rx.nic_queues_iters[i] ++;
-		lp->rx.nic_queues_count[i] += n_mbufs;
-		if (unlikely(lp->rx.nic_queues_iters[i] == APP_STATS*10)) {
-			struct rte_eth_stats stats;
-			struct timeval start_ewr, end_ewr;
-
-			rte_eth_stats_get(port, &stats);
-			gettimeofday(&lp->rx.end_ewr, NULL);
-
-			start_ewr = lp->rx.start_ewr; end_ewr = lp->rx.end_ewr;
-
-			if(lp->rx.record)
-			{
-				fprintf(lp->rx.record,"%lu\t%lf\t%.1lf\t%u\n",
-				start_ewr.tv_sec,
-				(((stats.ibytes)+stats.ipackets*(/*4crc+8prelud+12ifg*/(8+12)))/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec))/1000000.))/(1000*1000*1000./8.),
-				(double)stats.ipackets/((((double)end_ewr.tv_sec * (double)1000000. + (double)end_ewr.tv_usec) - ((double)start_ewr.tv_sec * (double)1000000. + (double)start_ewr.tv_usec)) /(double)1000000.),
-				(uint32_t) stats.ierrors
-				);
-				fflush(lp->rx.record);
-			}
-			else
-			{
-#ifdef QUEUE_STATS
-			if(queue==0)
-			{
-#endif
-			printf("NIC port %u: drop ratio = %.2f (%u/%u) speed: %lf Gbps (%.1lf pkts/s)\n",
-				(unsigned) port,
-				(double) stats.ierrors / (double) (stats.ierrors + stats.ipackets),
-				(uint32_t) stats.ipackets, (uint32_t) stats.ierrors,
-				(((stats.ibytes)+stats.ipackets*(/*4crc+8prelud+12ifg*/(8+12)))/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec))/1000000.))/(1000*1000*1000./8.),
-				stats.ipackets/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec)) /1000000.)
-				);
-#ifdef QUEUE_STATS
-			}
-			printf("NIC port %u:%u: drop ratio = %.2f (%u/%u) speed %.1lf pkts/s\n",
-				(unsigned) port, queue,
-				(double) stats.ierrors / (double) (stats.ierrors + lp->rx.nic_queues_count[i]),
-				(uint32_t) lp->rx.nic_queues_count[i], (uint32_t) stats.ierrors,
-				lp->rx.nic_queues_count[i]/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec)) /1000000.)
-				);
-#endif
-			}
-			lp->rx.nic_queues_iters[i] = 0;
-			lp->rx.nic_queues_count[i] = 0;
-
-#ifdef QUEUE_STATS
-                       	if(queue==0)
-#endif
-			rte_eth_stats_reset (port);
-
-#ifdef QUEUE_STATS
-                  	if(queue==0)
-#endif
-			lp->rx.start_ewr = end_ewr; // Updating start
-		}
-#endif
 
 #if APP_IO_RX_DROP_ALL_PACKETS
 		for (j = 0; j < n_mbufs; j ++) {
@@ -377,6 +310,43 @@ app_lcore_io_rx_flush(struct app_lcore_params_io *lp, uint32_t n_workers)
 	}
 }
 
+static inline void app_fill_1packet_frompcap(
+	struct app_lcore_params_io *lp,
+	uint8_t port_id,
+	struct rte_mbuf * pkt)
+	{
+		// get pointers
+		uint8_t * pointer = lp->tx.pcapfile_cur;
+		pcaprec_hdr_tJZ * header = (pcaprec_hdr_tJZ *)pointer;
+		uint8_t * data = pointer+sizeof(pcaprec_hdr_tJZ);
+		int len = header->incl_len;
+		
+		// copy data
+		pkt->pkt_len = len;
+		pkt->data_len = len;
+		pkt->port = port_id;
+		rte_memcpy(rte_ctrlmbuf_data(pkt),data,len);
+
+		//move pointers
+		lp->tx.pcapfile_cur+=len+sizeof(pcaprec_hdr_tJZ);
+		if(unlikely(lp->tx.pcapfile_cur==lp->tx.pcapfile_end))
+			lp->tx.pcapfile_cur=lp->tx.pcapfile_start;
+	}
+
+static inline void app_fill_packets_frompcap(
+	struct app_lcore_params_io *lp,
+	uint8_t port_id,
+	struct rte_mbuf ** pkts,
+	const uint16_t nb_pkts)
+{
+	int i;
+	for (i=0;i<nb_pkts;i++)
+	{
+		app_fill_1packet_frompcap(lp,port_id,pkts[i]);
+	}
+}
+
+
 static inline void
 app_lcore_io_tx(
 	struct app_lcore_params_io *lp,
@@ -386,29 +356,17 @@ app_lcore_io_tx(
 {
 	uint32_t worker;
 
-	const uint8_t icmppkt []={
-	0x00, 0x1b, 0x21, 0xad, 0xa9, 0x9c, 0x14, 0xdd, 0xa9, 0xd2, 0xef, 0x57, 0x08, 0x00, 0x45, 0x00,
-	0x00, 0x54, 0x51, 0x36, 0x40, 0x00, 0x40, 0x01, 0x6b, 0xee, 0x96, 0xf4, 0x3a, 0x72, 0xd8, 0x3a,
-	0xd3, 0xe3, 0x08, 0x00, 0xeb, 0xe1, 0x66, 0x02, 0x00, 0x1a, 0x67, 0x72, 0x97, 0x57, 0x00, 0x00,
-	0x00, 0x00, 0xe4, 0x64, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
-	0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25,
-	0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35,
-	0x36, 0x37
-	};
-	const int icmppktlen = 98;
-
 	for (worker = 0; worker < n_workers; worker ++) {
 		uint32_t i;
 
 		for (i = 0; i < lp->tx.n_nic_ports; i ++) {
 			uint8_t port = lp->tx.nic_ports[i];
 			//struct rte_ring *ring = lp->tx.rings[port][worker];
-			uint32_t n_mbufs, n_pkts;
+			uint32_t n_pkts;
 			//int ret;
 
 			//UNUSED -> uncoment :)
 			(void)bsz_rd;
-			(void)bsz_wr;
 
 			//n_mbufs = lp->tx.mbuf_out[port].n_mbufs;
 			/*ret = rte_ring_sc_dequeue_bulk(
@@ -422,14 +380,10 @@ app_lcore_io_tx(
 
 			n_mbufs += bsz_rd;*/
 
-			n_mbufs = 1;
+			if(rte_pktmbuf_alloc_bulk (app.pools[0], lp->tx.mbuf_out[port].array, bsz_wr))
+				continue; //error
 
-			struct rte_mbuf * tmpbuf = rte_ctrlmbuf_alloc(app.pools[0]) ;
-			tmpbuf->pkt_len = icmppktlen;
-			tmpbuf->data_len = icmppktlen;
-			tmpbuf->port = port;
-			memcpy(rte_ctrlmbuf_data(tmpbuf),icmppkt,icmppktlen);
-			*((hptl_t*)(rte_ctrlmbuf_data(tmpbuf)+icmppktlen-8)) = hptl_get();
+			app_fill_packets_frompcap(lp, port, lp->tx.mbuf_out[port].array, bsz_wr );
 
 			/*if (unlikely(n_mbufs < bsz_wr)) {
 				lp->tx.mbuf_out[port].n_mbufs = n_mbufs;
@@ -439,18 +393,16 @@ app_lcore_io_tx(
 			n_pkts = rte_eth_tx_burst(
 				port,
 				0,
-				&tmpbuf,
-				1);
+				lp->tx.mbuf_out[port].array,
+				bsz_wr);
 
-			if (unlikely(n_pkts < n_mbufs)) {
-				uint32_t k;
-				for (k = n_pkts; k < n_mbufs; k ++) {
-					struct rte_mbuf *pkt_to_free = lp->tx.mbuf_out[port].array[k];
-					rte_pktmbuf_free(pkt_to_free);
-				}
+			while (unlikely(n_pkts < bsz_wr)) {
+				n_pkts += rte_eth_tx_burst(
+					port,
+					0,
+					lp->tx.mbuf_out[port].array+n_pkts,
+					bsz_wr-n_pkts);
 			}
-			lp->tx.mbuf_out[port].n_mbufs = 0;
-			lp->tx.mbuf_out_flush[port] = 0;
 		}
 	}
 }
@@ -493,16 +445,10 @@ app_lcore_main_loop_io(void)
 {
 	uint32_t lcore = rte_lcore_id();
 	struct app_lcore_params_io *lp = &app.lcore_params[lcore].io;
-	uint32_t n_workers = app_get_lcores_worker();
 	uint64_t i = 0;
 
-	uint32_t bsz_rx_rd = app.burst_size_io_rx_read;
-	uint32_t bsz_rx_wr = app.burst_size_io_rx_write;
-
-	uint8_t pos_lb = app.pos_lb;
-
 	for ( ; ; ) {
-		if (APP_LCORE_IO_FLUSH && (unlikely(i == APP_LCORE_IO_FLUSH))) {
+		/*if (APP_LCORE_IO_FLUSH && (unlikely(i == APP_LCORE_IO_FLUSH))) {
 			if (likely(lp->rx.n_nic_queues > 0)) {
 				app_lcore_io_rx_flush(lp, n_workers); 
 			}
@@ -511,7 +457,7 @@ app_lcore_main_loop_io(void)
 
 		if (likely(lp->rx.n_nic_queues > 0)) {
 			app_lcore_io_rx(lp, n_workers, bsz_rx_rd, bsz_rx_wr, pos_lb); 
-		}
+		}*/
 
 		if (likely(lp->tx.n_nic_ports > 0)) {
 			app_lcore_io_tx(lp, 1, app.burst_size_io_tx_read, app.burst_size_io_tx_write); 
