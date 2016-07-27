@@ -194,39 +194,6 @@ app_init_rings_rx(void)
 			continue;
 		}
 
-		int fd = open(pcap_File, O_RDONLY);
-
-		if(fd == -1)
-		{
-			perror("pcap file");
-			exit(-1);
-		}
-
-			struct stat sb;
-
-		if (fstat(fd, &sb) == -1) {
-			perror("pcap file size unknown");
-			exit(-1);
-		}
-		
-		fprintf(stderr, "Preloading file...");
-		fflush(stderr);
-
-		lp_io->tx.pcapfile_start = mmap(NULL, sb.st_size, PROT_READ,
-						MAP_PRIVATE | MAP_POPULATE, fd, 0);
-
-		if (lp_io->tx.pcapfile_start == MAP_FAILED) {
-			perror("mmap failed");
-			exit(-1);
-		}
-
-		fprintf(stderr, "Done!\n");
-		fflush(stderr);
-
-		lp_io->tx.pcapfile_end    = lp_io->tx.pcapfile_start + sb.st_size;
-		lp_io->tx.pcapfile_start += sizeof(pcap_hdr_tJZ);
-		lp_io->tx.pcapfile_cur = lp_io->tx.pcapfile_start;
-
 		socket_io = rte_lcore_to_socket_id(lcore);
 
 		for (lcore_worker = 0; lcore_worker < APP_MAX_LCORES; lcore_worker ++) {
@@ -350,6 +317,39 @@ app_init_rings_tx(void)
 		    (lp_io->tx.n_nic_ports == 0)) {
 			continue;
 		}
+
+		int fd = open(pcap_File, O_RDONLY);
+
+		if(fd == -1)
+		{
+			perror("pcap file");
+			exit(-1);
+		}
+
+			struct stat sb;
+
+		if (fstat(fd, &sb) == -1) {
+			perror("pcap file size unknown");
+			exit(-1);
+		}
+		
+		fprintf(stderr, "Preloading file...");
+		fflush(stderr);
+
+		lp_io->tx.pcapfile_start = mmap(NULL, sb.st_size, PROT_READ,
+						MAP_PRIVATE | MAP_POPULATE, fd, 0);
+
+		if (lp_io->tx.pcapfile_start == MAP_FAILED) {
+			perror("mmap failed");
+			exit(-1);
+		}
+
+		fprintf(stderr, "Done!\n");
+		fflush(stderr);
+
+		lp_io->tx.pcapfile_end    = lp_io->tx.pcapfile_start + sb.st_size;
+		lp_io->tx.pcapfile_start += sizeof(pcap_hdr_tJZ);
+		lp_io->tx.pcapfile_cur = lp_io->tx.pcapfile_start;
 
 		for (i = 0; i < lp_io->tx.n_nic_ports; i ++){
 			unsigned port, j;
