@@ -403,6 +403,26 @@ app_lcore_io_tx(
 					lp->tx.mbuf_out[port].array+n_pkts,
 					bsz_wr-n_pkts);
 			}
+			
+#if APP_STATS
+			lp->tx.nic_ports_iters[port] ++;
+			lp->tx.nic_ports_count[port] += n_pkts;
+			if (unlikely(lp->tx.nic_ports_iters[port] == APP_STATS)) {
+					struct rte_eth_stats stats;
+					unsigned lcore = rte_lcore_id();
+
+					rte_eth_stats_get(port, &stats);
+
+					printf("\t\t\tI/O TX %u out (port %u): NIC drop ratio = %.2f (%u/%u) avg burst size = %.2f\n",
+							lcore,
+							(unsigned) port,
+							(double) stats.oerrors / (double) (stats.oerrors + stats.opackets),
+							(uint32_t) stats.opackets, (uint32_t) stats.oerrors,
+							((double) lp->tx.nic_ports_count[port]) / ((double) lp->tx.nic_ports_iters[port]));
+					lp->tx.nic_ports_iters[port] = 0;
+					lp->tx.nic_ports_count[port] = 0;
+			}
+#endif
 		}
 	}
 }
