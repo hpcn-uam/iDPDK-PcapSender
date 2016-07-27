@@ -1,7 +1,8 @@
 #!/bin/bash
 
-if [$# -ne 1];
+if [ $# -ne 1 ]
     then echo "A pcap file should be provided to this script. Example: ./scripts/scriptname.sh file.pcap"
+    exit 1
 fi
 
 git submodule update --init
