@@ -1,14 +1,12 @@
 #!/bin/bash
 
-cd ..
-git submodule update --init
-cd src
-make
-
 if [$# -ne 1];
     then echo "A pcap file should be provided to this script. Example: ./scripts/scriptname.sh file.pcap"
 fi
 
+git submodule update --init
+cd src
+make
 
         # c = numero de procesadores
         # n = numero de canales de memoria
