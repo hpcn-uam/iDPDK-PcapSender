@@ -403,24 +403,32 @@ app_lcore_io_tx(
 					lp->tx.mbuf_out[port].array+n_pkts,
 					bsz_wr-n_pkts);
 			}
-			
+
 #if APP_STATS
 			lp->tx.nic_ports_iters[port] ++;
 			lp->tx.nic_ports_count[port] += n_pkts;
 			if (unlikely(lp->tx.nic_ports_iters[port] == APP_STATS)) {
 					struct rte_eth_stats stats;
+					struct timeval start_ewr, end_ewr;
 					unsigned lcore = rte_lcore_id();
 
 					rte_eth_stats_get(port, &stats);
+					gettimeofday(&lp->rx.end_ewr, NULL);
+					start_ewr = lp->rx.start_ewr; end_ewr = lp->rx.end_ewr;
 
-					printf("\t\t\tI/O TX %u out (port %u): NIC drop ratio = %.2f (%u/%u) avg burst size = %.2f\n",
+					printf("\t\t\tI/O TX %u out (port %u): NIC drop ratio = %.2f (%u/%u) avg burst size = %.2f speed: %lf Gbps (%.1lf pkts/s)\n",
 							lcore,
 							(unsigned) port,
 							(double) stats.oerrors / (double) (stats.oerrors + stats.opackets),
 							(uint32_t) stats.opackets, (uint32_t) stats.oerrors,
-							((double) lp->tx.nic_ports_count[port]) / ((double) lp->tx.nic_ports_iters[port]));
+							((double) lp->tx.nic_ports_count[port]) / ((double) lp->tx.nic_ports_iters[port]),
+							(((stats.ibytes)+stats.ipackets*(/*4crc+8prelud+12ifg*/(8+12)))/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec))/1000000.))/(1000*1000*1000./8.),
+                                stats.ipackets/(((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) - (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec)) /1000000.)
+					);
 					lp->tx.nic_ports_iters[port] = 0;
 					lp->tx.nic_ports_count[port] = 0;
+					rte_eth_stats_reset (port);
+					lp->rx.start_ewr = end_ewr; // Updating start
 			}
 #endif
 		}
