@@ -110,7 +110,8 @@ static const char usage[] =
 "               is %u)                                                          \n"
 "           E = I/O TX lcore read burst size from input SW rings (default value \n"
 "               is %u)                                                          \n"
-"           F = I/O TX lcore write burst size to NIC TX (default value is %u)   \n";
+"           F = I/O TX lcore write burst size to NIC TX (default value is %u)   \n"
+"    --caida: Use CAIDA trace\n";
 
 void
 app_print_usage(void)
@@ -488,32 +489,8 @@ parse_arg_bsz(const char *arg)
 #define APP_ARG_NUMERICAL_SIZE_CHARS 15
 #endif
 
-static int
-parse_arg_pos_lb(const char *arg)
-{
-	uint32_t x;
-	char *endpt;
-
-	if (strnlen(arg, APP_ARG_NUMERICAL_SIZE_CHARS + 1) == APP_ARG_NUMERICAL_SIZE_CHARS + 1) {
-		return -1;
-	}
-
-	errno = 0;
-	x = strtoul(arg, &endpt, 10);
-	if (errno != 0 || endpt == arg || *endpt != '\0'){
-		return -2;
-	}
-
-	if (x >= 64) {
-		return -3;
-	}
-
-	app.pos_lb = (uint8_t) x;
-
-	return 0;
-}
-
 extern char pcap_File [256];
+extern uint8_t caidaTrace;
 
 /* Parse the argument given in the command line of the application */
 int
@@ -531,6 +508,7 @@ app_parse_args(int argc, char **argv)
 		{"tx", 1, 0, 0},
 		{"rsz", 1, 0, 0},
 		{"bsz", 1, 0, 0},
+		{"caida", 0, 0, 0},
 		{NULL, 0, 0, 0}
 	};
 	uint32_t arg_rx = 0;
@@ -590,13 +568,8 @@ app_parse_args(int argc, char **argv)
 					return -1;
 				}
 			}
-			if (!strcmp(lgopts[option_index].name, "pos-lb")) {
-				arg_pos_lb = 1;
-				ret = parse_arg_pos_lb(optarg);
-				if (ret) {
-					printf("Incorrect value for --pos-lb argument (%d)\n", ret);
-					return -1;
-				}
+			if (!strcmp(lgopts[option_index].name, "caida")) {
+				caidaTrace = 1;
 			}
 			break;
 

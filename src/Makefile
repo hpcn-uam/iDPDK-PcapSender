@@ -34,7 +34,7 @@ $(error "Please define RTE_SDK environment variable")
 endif
 
 # Default target, can be overriden by command line or environment
-RTE_TARGET ?= x86_64-default-linuxapp-gcc
+RTE_TARGET ?= x86_64-native-linuxapp-gcc
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
@@ -44,7 +44,7 @@ APP = hpcn_n2d
 # all source are stored in SRCS-y
 SRCS-y := main.c config.c init.c runtime.c hptl.c
 
-CFLAGS += -O3 -march=native -msse4.2 -msse4.1 -mssse3 -msse4 -msse2
+CFLAGS += -g -O3 -march=native -msse4.2 -msse4.1 -mssse3 -msse4 -msse2
 # CFLAGS += -g 
 CFLAGS += $(WERROR_FLAGS) #-DTESTMAIN -DEXTHDD
 CFLAGS_config.o := -D_GNU_SOURCE

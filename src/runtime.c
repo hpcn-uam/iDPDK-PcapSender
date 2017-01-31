@@ -125,6 +125,13 @@
 #define APP_IO_TX_PREFETCH1(p)
 #endif
 
+uint8_t caidaTrace = 0;
+char ethernetHeader[] = {
+	0xFF, 0xFF, 0xFF, 0xFF,	0xFF, 0xFF,	
+	0x58, 0xBB, 0xCC, 0xDD, 0xEE, 0x58,
+	0x08, 0x00
+};
+
 static inline void
 app_lcore_io_rx_buffer_to_send (
 	struct app_lcore_params_io *lp,
@@ -319,16 +326,25 @@ static inline void app_fill_1packet_frompcap(
 		uint8_t * pointer = lp->tx.pcapfile_cur;
 		pcaprec_hdr_tJZ * header = (pcaprec_hdr_tJZ *)pointer;
 		uint8_t * data = pointer+sizeof(pcaprec_hdr_tJZ);
-		int len = header->incl_len;
+		int len = header->orig_len;
+		int caplen = header->incl_len;
+		char * pktptr = rte_ctrlmbuf_data(pkt);
+
+		if(caidaTrace)
+		{		
+			len+=10; //añadir longitud eth truncada
+			rte_memcpy(pktptr,ethernetHeader, sizeof(ethernetHeader));
+			pktptr+=sizeof(ethernetHeader);
+		}
 		
 		// copy data
 		pkt->pkt_len = len;
 		pkt->data_len = len;
 		pkt->port = port_id;
-		rte_memcpy(rte_ctrlmbuf_data(pkt),data,len);
+		rte_memcpy(pktptr,data,caplen);
 
 		//move pointers
-		lp->tx.pcapfile_cur+=len+sizeof(pcaprec_hdr_tJZ);
+		lp->tx.pcapfile_cur+=caplen+sizeof(pcaprec_hdr_tJZ);
 		if(unlikely(lp->tx.pcapfile_cur==lp->tx.pcapfile_end))
 			lp->tx.pcapfile_cur=lp->tx.pcapfile_start;
 	}
