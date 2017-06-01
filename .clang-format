@@ -1,0 +1,25 @@
+BasedOnStyle: Google
+
+IndentWidth: 4
+TabWidth: 4
+UseTab: ForIndentation
+
+BreakBeforeBraces: Attach
+IndentCaseLabels: true
+SpaceBeforeParens: Always
+
+AlignAfterOpenBracket: true
+AlignConsecutiveAssignments: true
+AlignEscapedNewlinesLeft: true
+AlignOperands: true
+AlignTrailingComments: true
+
+AllowShortFunctionsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+BinPackArguments: false
+BinPackParameters: false
+
+ColumnLimit: 100
+
+Cpp11BracedListStyle: true
