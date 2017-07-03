@@ -35,6 +35,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <numaif.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -126,23 +127,6 @@ static struct rte_eth_txconf tx_conf = {
     .tx_rs_thresh   = APP_DEFAULT_NIC_TX_RS_THRESH,
 };
 
-static void app_assign_worker_ids (void) {
-	uint32_t lcore, worker_id;
-
-	/* Assign ID for each worker */
-	worker_id = 0;
-	for (lcore = 0; lcore < APP_MAX_LCORES; lcore++) {
-		struct app_lcore_params_worker *lp_worker = &app.lcore_params[lcore].worker;
-
-		if (app.lcore_params[lcore].type != e_APP_LCORE_WORKER) {
-			continue;
-		}
-
-		lp_worker->worker_id = worker_id;
-		worker_id++;
-	}
-}
-
 static void app_init_mbuf_pools (void) {
 	unsigned socket, lcore;
 
@@ -183,176 +167,62 @@ static void app_init_mbuf_pools (void) {
 
 char pcap_File[256] = {0};
 
-static void app_init_rings_rx (void) {
-	unsigned lcore;
-
-	/* Initialize the rings for the RX side */
-	for (lcore = 0; lcore < APP_MAX_LCORES; lcore++) {
-		struct app_lcore_params_io *lp_io = &app.lcore_params[lcore].io;
-		unsigned socket_io, lcore_worker;
-
-		if ((app.lcore_params[lcore].type != e_APP_LCORE_IO) || (lp_io->rx.n_nic_queues == 0)) {
-			continue;
-		}
-
-		socket_io = rte_lcore_to_socket_id (lcore);
-
-		for (lcore_worker = 0; lcore_worker < APP_MAX_LCORES; lcore_worker++) {
-			char name[32];
-			struct app_lcore_params_worker *lp_worker = &app.lcore_params[lcore_worker].worker;
-			struct rte_ring *ring                     = NULL;
-
-			if (app.lcore_params[lcore_worker].type != e_APP_LCORE_WORKER) {
-				continue;
-			}
-
-			printf ("Creating ring to connect I/O lcore %u (socket %u) with worker lcore %u ...\n",
-			        lcore,
-			        socket_io,
-			        lcore_worker);
-			snprintf (
-			    name, sizeof (name), "app_ring_rx_s%u_io%u_w%u", socket_io, lcore, lcore_worker);
-			ring =
-			    rte_ring_create (name, app.ring_rx_size, socket_io, RING_F_SP_ENQ | RING_F_SC_DEQ);
-			if (ring == NULL) {
-				rte_panic ("Cannot create ring to connect I/O core %u with worker core %u\n",
-				           lcore,
-				           lcore_worker);
-			}
-
-			lp_io->rx.rings[lp_io->rx.n_rings] = ring;
-			lp_io->rx.n_rings++;
-
-			lp_worker->rings_in[lp_worker->n_rings_in] = ring;
-			lp_worker->n_rings_in++;
-		}
-	}
-
-	for (lcore = 0; lcore < APP_MAX_LCORES; lcore++) {
-		struct app_lcore_params_io *lp_io = &app.lcore_params[lcore].io;
-
-		if ((app.lcore_params[lcore].type != e_APP_LCORE_IO) || (lp_io->rx.n_nic_queues == 0)) {
-			continue;
-		}
-
-		if (lp_io->rx.n_rings != app_get_lcores_worker ()) {
-			rte_panic ("Algorithmic error (I/O RX rings)\n");
-		}
-	}
-
-	for (lcore = 0; lcore < APP_MAX_LCORES; lcore++) {
-		struct app_lcore_params_worker *lp_worker = &app.lcore_params[lcore].worker;
-
-		if (app.lcore_params[lcore].type != e_APP_LCORE_WORKER) {
-			continue;
-		}
-
-		if (lp_worker->n_rings_in != app_get_lcores_io_rx ()) {
-			rte_panic ("Algorithmic error (worker input rings)\n");
-		}
-	}
-}
-
 static void app_init_rings_tx (void) {
 	unsigned lcore;
 
 	/* Initialize the rings for the TX side */
 	for (lcore = 0; lcore < APP_MAX_LCORES; lcore++) {
-		struct app_lcore_params_worker *lp_worker = &app.lcore_params[lcore].worker;
 		unsigned port;
 
-		if (app.lcore_params[lcore].type != e_APP_LCORE_WORKER) {
-			continue;
-		}
-
 		for (port = 0; port < APP_MAX_NIC_PORTS; port++) {
-			char name[32];
-			struct app_lcore_params_io *lp_io = NULL;
-			struct rte_ring *ring;
-			uint32_t socket_io, lcore_io;
+			uint32_t lcore_io;
 
-			if (app.nic_tx_port_mask[port] == 0) {
+			if (app_get_nic_tx_queues_per_port (port) == 0) {
 				continue;
 			}
 
-			if (app_get_lcore_for_nic_tx ((uint8_t)port, &lcore_io) < 0) {
-				rte_panic ("Algorithmic error (no I/O core to handle TX of port %u)\n", port);
-			}
-
-			lp_io     = &app.lcore_params[lcore_io].io;
-			socket_io = rte_lcore_to_socket_id (lcore_io);
-
-			printf (
-			    "Creating ring to connect worker lcore %u with TX port %u (through I/O lcore %u) "
-			    "(socket %u) ...\n",
-			    lcore,
-			    port,
-			    (unsigned)lcore_io,
-			    (unsigned)socket_io);
-			snprintf (name, sizeof (name), "app_ring_tx_s%u_w%u_p%u", socket_io, lcore, port);
-			ring =
-			    rte_ring_create (name, app.ring_tx_size, socket_io, RING_F_SP_ENQ | RING_F_SC_DEQ);
-			if (ring == NULL) {
+			if (app_get_lcore_for_nic_tx ((uint8_t)port, 0, &lcore_io) <
+			    0) {  // TODO check other queues
 				rte_panic (
-				    "Cannot create ring to connect worker core %u with TX port %u\n", lcore, port);
-			}
-
-			lp_worker->rings_out[port]                  = ring;
-			lp_io->tx.rings[port][lp_worker->worker_id] = ring;
-		}
-	}
-
-	int fd = open (pcap_File, O_RDONLY);
-
-	if (fd == -1) {
-		perror ("pcap file");
-		exit (-1);
-	}
-
-	struct stat sb;
-
-	if (fstat (fd, &sb) == -1) {
-		perror ("pcap file size unknown");
-		exit (-1);
-	}
-
-	fprintf (stderr, "Preloading file...");
-	fflush (stderr);
-
-	void *pcapfile_start = mmap (NULL, sb.st_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
-
-	if (pcapfile_start == MAP_FAILED) {
-		perror ("mmap failed");
-		exit (-1);
-	}
-
-	fprintf (stderr, "Done!\n");
-	fflush (stderr);
-
-	for (lcore = 0; lcore < APP_MAX_LCORES; lcore++) {
-		struct app_lcore_params_io *lp_io = &app.lcore_params[lcore].io;
-		unsigned i;
-
-		if ((app.lcore_params[lcore].type != e_APP_LCORE_IO) || (lp_io->tx.n_nic_ports == 0)) {
-			continue;
-		}
-
-		lp_io->tx.pcapfile_start = pcapfile_start;
-
-		lp_io->tx.pcapfile_end = lp_io->tx.pcapfile_start + sb.st_size;
-		lp_io->tx.pcapfile_start += sizeof (pcap_hdr_tJZ);
-		lp_io->tx.pcapfile_cur = lp_io->tx.pcapfile_start;
-
-		for (i = 0; i < lp_io->tx.n_nic_ports; i++) {
-			unsigned port, j;
-
-			port = lp_io->tx.nic_ports[i];
-			for (j = 0; j < app_get_lcores_worker (); j++) {
-				if (lp_io->tx.rings[port][j] == NULL) {
-					rte_panic ("Algorithmic error (I/O TX rings)\n");
-				}
+				    "Algorithmic error (no I/O core to handle TX of port %u "
+				    "and queue 0)\n",
+				    port);
 			}
 		}
+
+		/*Memory Node*/
+		unsigned long nodemask = 1 << rte_lcore_to_socket_id (lcore);
+		int ret                = set_mempolicy (MPOL_BIND, &nodemask, sizeof (nodemask) * 8);
+		printf ("Binding mmap memory (mask: %016lx) => %d\n", nodemask, ret);
+
+		/*Init pcap*/
+		int fd = open (pcap_File, O_RDONLY);
+
+		if (fd == -1) {
+			perror ("pcap file");
+			exit (-1);
+		}
+
+		struct stat sb;
+
+		if (fstat (fd, &sb) == -1) {
+			perror ("pcap file size unknown");
+			exit (-1);
+		}
+
+		fprintf (stderr, "Preloading file...");
+		fflush (stderr);
+
+		void *pcapfile_start =
+		    mmap (NULL, sb.st_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
+
+		if (pcapfile_start == MAP_FAILED) {
+			perror ("mmap failed");
+			exit (-1);
+		}
+
+		fprintf (stderr, "Done!\n");
+		fflush (stderr);
 	}
 }
 
@@ -372,7 +242,7 @@ static void check_all_ports_link_status (uint8_t port_num, uint32_t port_mask) {
 			if ((port_mask & (1 << portid)) == 0)
 				continue;
 			n_rx_queues = app_get_nic_rx_queues_per_port (portid);
-			n_tx_queues = app.nic_tx_port_mask[portid];
+			n_tx_queues = app_get_nic_tx_queues_per_port (portid);
 			if ((n_rx_queues == 0) && (n_tx_queues == 0))
 				continue;
 			memset (&link, 0, sizeof (link));
@@ -417,7 +287,7 @@ static void check_all_ports_link_status (uint8_t port_num, uint32_t port_mask) {
 
 static void app_init_nics (void) {
 	unsigned socket;
-	uint32_t lcore;
+	uint32_t lcore = 0;
 	uint8_t port, queue;
 	int ret;
 	uint32_t n_rx_queues, n_tx_queues;
@@ -427,7 +297,7 @@ static void app_init_nics (void) {
 		struct rte_mempool *pool;
 
 		n_rx_queues = app_get_nic_rx_queues_per_port (port);
-		n_tx_queues = app.nic_tx_port_mask[port];
+		n_tx_queues = app_get_nic_tx_queues_per_port (port);
 
 		if ((n_rx_queues == 0) && (n_tx_queues == 0)) {
 			continue;
@@ -463,14 +333,22 @@ static void app_init_nics (void) {
 		}
 
 		/* Init TX queues */
-		if (app.nic_tx_port_mask[port] == 1) {
-			app_get_lcore_for_nic_tx (port, &lcore);
+		for (queue = 0; queue < APP_MAX_TX_QUEUES_PER_NIC_PORT; queue++) {
+			if (app.nic_tx_queue_mask[port][queue] == 0) {
+				continue;
+			}
+
+			app_get_lcore_for_nic_tx (port, queue, &lcore);
 			socket = rte_lcore_to_socket_id (lcore);
-			printf ("Initializing NIC port %u TX queue 0 ...\n", (unsigned)port);
-			ret =
-			    rte_eth_tx_queue_setup (port, 0, (uint16_t)app.nic_tx_ring_size, socket, &tx_conf);
+
+			printf ("Initializing NIC port %u TX queue %u ...\n", (unsigned)port, (unsigned)queue);
+			ret = rte_eth_tx_queue_setup (
+			    port, queue, (uint16_t)app.nic_tx_ring_size, socket, &tx_conf);
 			if (ret < 0) {
-				rte_panic ("Cannot init TX queue 0 for port %d (%d)\n", port, ret);
+				rte_panic ("Cannot init TX queue %u for port %u (%d)\n",
+				           (unsigned)queue,
+				           (unsigned)port,
+				           ret);
 			}
 		}
 
@@ -485,15 +363,16 @@ static void app_init_nics (void) {
 }
 
 void app_init (void) {
-	app_assign_worker_ids ();
 	app_init_mbuf_pools ();
-	app_init_rings_rx ();
+	// app_init_rings_rx ();
 	app_init_rings_tx ();
 	app_init_nics ();
 
 	// HPTL
 	hptl_config conf = {.clockspeed = 0, .precision = 9};
 	hptl_init (&conf);
+
+	printf ("Using HPTL %s.\n", hptl_VERSION);
 
 	printf ("Initialization completed.\n");
 }

@@ -1,13 +1,13 @@
 /*-
  *   BSD LICENSE
- * 
+ *
  *   Copyright(c) 2010-2014 Intel Corporation. All rights reserved.
  *   All rights reserved.
- * 
+ *
  *   Redistribution and use in source and binary forms, with or without
  *   modification, are permitted provided that the following conditions
  *   are met:
- * 
+ *
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
  *     * Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  *     * Neither the name of Intel Corporation nor the names of its
  *       contributors may be used to endorse or promote products derived
  *       from this software without specific prior written permission.
- * 
+ *
  *   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  *   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  *   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -74,29 +74,27 @@
 
 #include "main.h"
 
-int
-MAIN(int argc, char **argv)
-{
+int MAIN (int argc, char **argv) {
 	uint32_t lcore;
 	int ret;
 
 	/* Init EAL */
-	ret = rte_eal_init(argc, argv);
+	ret = rte_eal_init (argc, argv);
 	if (ret < 0)
 		return -1;
 	argc -= ret;
 	argv += ret;
 
 	/* Parse application arguments (after the EAL ones) */
-	ret = app_parse_args(argc, argv);
+	ret = app_parse_args (argc, argv);
 	if (ret < 0) {
-		app_print_usage();
+		app_print_usage ();
 		return -1;
 	}
-	
+
 	/* Init */
-	app_init();
-	app_print_params();
+	app_init ();
+	app_print_params ();
 
 	/* Launch per-lcore init on every lcore */
 	rte_eal_mp_remote_launch(app_lcore_main_loop, NULL, CALL_MASTER);

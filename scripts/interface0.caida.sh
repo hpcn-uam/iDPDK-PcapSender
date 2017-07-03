@@ -5,9 +5,9 @@ if [ $# -ne 1 ]
     exit 1
 fi
 
-git submodule update --init
-cd src
-make
+if [ -z ${RTE_SDK+x} ]; then
+        export RTE_SDK=$(pwd)/dpdk
+fi
 
         # c = numero de procesadores
         # n = numero de canales de memoria
@@ -38,6 +38,9 @@ make
         #       is 144)
         #   F = I/O TX lcore write burst size to NIC TX (default value is 144)
 
+git submodule update --init
+cd src
+make && \
         build/app/hpcn_n2d -c F -n 2 -- --rx "(0,0,1)" --tx "(0,2)" \
                 --rsz "1024, 2048, 1024, 1024" \
                 --bsz "(144, 144), (144, 144), (144, 144)" \
