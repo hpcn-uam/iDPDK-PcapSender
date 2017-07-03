@@ -12,7 +12,7 @@ fi
         # c = numero de procesadores
         # n = numero de canales de memoria
         # --rx "(PORT, QUEUE, LCORE), ..." : List of NIC RX ports and queues
-        # tx "(PORT, LCORE), ..." : List of NIC TX ports handled by the I/O TX
+        # tx "(PORT, QUEUE, LCORE), ..." : List of NIC TX ports handled by the I/O TX
         # w "LCORE, ..." : List of the worker lcores
         # OPTIONAL:
         # rsz "A, B, C, D" : Ring sizes
@@ -41,7 +41,7 @@ fi
 git submodule update --init
 cd src
 make && \
-        build/app/hpcn_n2d -c F -n 2 -- --rx "(0,0,1)" --tx "(0,2)" \
-                --rsz "1024, 2048, 1024, 1024" \
-                --bsz "(144, 144), (144, 144), (144, 144)" \
+        build/app/hpcn_n2d -c F -n 2 -- --rx "(0,0,1)" --tx "(0,0,2)" \
+                --rsz "1024, 1024" \
+                --bsz "144, 144" \
 		--caida --pcap "$1"
