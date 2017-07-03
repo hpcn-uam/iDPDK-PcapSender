@@ -246,7 +246,7 @@ static void check_all_ports_link_status (uint8_t port_num, uint32_t port_mask) {
 			if ((n_rx_queues == 0) && (n_tx_queues == 0))
 				continue;
 			memset (&link, 0, sizeof (link));
-			rte_eth_link_get_nowait (portid, &link);
+			rte_eth_link_get (portid, &link);
 			/* print link status if flag set */
 			if (print_flag == 1) {
 				if (link.link_status)
