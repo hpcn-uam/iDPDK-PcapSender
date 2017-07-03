@@ -170,6 +170,39 @@ char pcap_File[256] = {0};
 static void app_init_rings_tx (void) {
 	unsigned lcore;
 
+	/*Memory Node*/
+	unsigned long nodemask = 1 << rte_lcore_to_socket_id (lcore);
+	int ret                = set_mempolicy (MPOL_BIND, &nodemask, sizeof (nodemask) * 8);
+	printf ("Binding mmap memory (mask: %016lx) => %d\n", nodemask, ret);
+
+	/*Init pcap*/
+	int fd = open (pcap_File, O_RDONLY);
+
+	if (fd == -1) {
+		perror ("pcap file");
+		exit (-1);
+	}
+
+	struct stat sb;
+
+	if (fstat (fd, &sb) == -1) {
+		perror ("pcap file size unknown");
+		exit (-1);
+	}
+
+	fprintf (stderr, "Preloading file...");
+	fflush (stderr);
+
+	void *pcapfile_start = mmap (NULL, sb.st_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
+
+	if (pcapfile_start == MAP_FAILED) {
+		perror ("mmap failed");
+		exit (-1);
+	}
+
+	fprintf (stderr, "Done!\n");
+	fflush (stderr);
+
 	/* Initialize the rings for the TX side */
 	for (lcore = 0; lcore < APP_MAX_LCORES; lcore++) {
 		unsigned port;
@@ -188,41 +221,13 @@ static void app_init_rings_tx (void) {
 				    "and queue 0)\n",
 				    port);
 			}
+			/*SetUp memory for current node*/
+			lp_io->tx.pcapfile_start = pcapfile_start;
+
+			lp_io->tx.pcapfile_end = lp_io->tx.pcapfile_start + sb.st_size;
+			lp_io->tx.pcapfile_start += sizeof (pcap_hdr_tJZ);
+			lp_io->tx.pcapfile_cur = lp_io->tx.pcapfile_start;
 		}
-
-		/*Memory Node*/
-		unsigned long nodemask = 1 << rte_lcore_to_socket_id (lcore);
-		int ret                = set_mempolicy (MPOL_BIND, &nodemask, sizeof (nodemask) * 8);
-		printf ("Binding mmap memory (mask: %016lx) => %d\n", nodemask, ret);
-
-		/*Init pcap*/
-		int fd = open (pcap_File, O_RDONLY);
-
-		if (fd == -1) {
-			perror ("pcap file");
-			exit (-1);
-		}
-
-		struct stat sb;
-
-		if (fstat (fd, &sb) == -1) {
-			perror ("pcap file size unknown");
-			exit (-1);
-		}
-
-		fprintf (stderr, "Preloading file...");
-		fflush (stderr);
-
-		void *pcapfile_start =
-		    mmap (NULL, sb.st_size, PROT_READ, MAP_PRIVATE | MAP_POPULATE, fd, 0);
-
-		if (pcapfile_start == MAP_FAILED) {
-			perror ("mmap failed");
-			exit (-1);
-		}
-
-		fprintf (stderr, "Done!\n");
-		fflush (stderr);
 	}
 }
 
