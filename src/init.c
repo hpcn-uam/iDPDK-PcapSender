@@ -171,7 +171,7 @@ static void app_init_rings_tx (void) {
 	unsigned lcore;
 
 	/*Memory Node*/
-	unsigned long nodemask = 1 << rte_lcore_to_socket_id (lcore);
+	unsigned long nodemask = 1 << 0;//rte_lcore_to_socket_id (lcore);
 	int ret                = set_mempolicy (MPOL_BIND, &nodemask, sizeof (nodemask) * 8);
 	printf ("Binding mmap memory (mask: %016lx) => %d\n", nodemask, ret);
 
@@ -222,6 +222,7 @@ static void app_init_rings_tx (void) {
 				    port);
 			}
 			/*SetUp memory for current node*/
+			struct app_lcore_params_io *lp_io = &app.lcore_params[lcore].io;
 			lp_io->tx.pcapfile_start = pcapfile_start;
 
 			lp_io->tx.pcapfile_end = lp_io->tx.pcapfile_start + sb.st_size;
