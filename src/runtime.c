@@ -250,12 +250,12 @@ static inline void app_lcore_io_tx (struct app_lcore_params_io *lp,
 
 				if (queue == 0) {
 					printf (
-					    "NIC TX port %u: drop ratio = %.2f (%u/%u) usefull-speed: %lf Gbps, "
+					    "NIC TX port %u: drop ratio = %.2f (%lu/%lu) usefull-speed: %lf Gbps, "
 					    "link-speed: %lf Gbps (%.1lf pkts/s)\n",
 					    (unsigned)port,
 					    (double)stats.oerrors / (double)(stats.oerrors + stats.opackets),
-					    (uint32_t)stats.opackets,
-					    (uint32_t)stats.oerrors,
+					    (uint64_t)stats.opackets,
+					    (uint64_t)stats.oerrors,
 					    (stats.obytes / (((end_ewr.tv_sec * 1000000. + end_ewr.tv_usec) -
 					                      (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec)) /
 					                     1000000.)) /
@@ -269,8 +269,8 @@ static inline void app_lcore_io_tx (struct app_lcore_params_io *lp,
 					                       (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec)) /
 					                      1000000.));
 
-					rte_eth_stats_reset (port);
-					lp->tx.start_ewr = end_ewr;  // Updating start
+					//rte_eth_stats_reset (port);
+					//lp->tx.start_ewr = end_ewr;  // Updating start
 				}
 
 				lp->tx.nic_queues_iters[i] = 0;
@@ -285,6 +285,8 @@ static void app_lcore_main_loop_io (void) {
 	uint32_t lcore                 = rte_lcore_id ();
 	struct app_lcore_params_io *lp = &app.lcore_params[lcore].io;
 	uint64_t i                     = 0;
+
+	gettimeofday (&lp->tx.start_ewr, NULL);
 
 	for (;;) {
 		/*if (APP_LCORE_IO_FLUSH && (unlikely(i == APP_LCORE_IO_FLUSH))) {
