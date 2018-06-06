@@ -10,14 +10,12 @@ if [ $# -le 0 ]
     exit 1
 fi
 
-if [ $# -eq 3 ]
+if [ $# -gt 1 ]
     then TXQUEUES=$2
-    exit 1
 fi
 
 TXPARAM="($NICIFACE,0,$BASECPU)"
 if [ $TXQUEUES -gt 1 ]; then
-        TXQUEUES=$(($TXQUEUES + 1))
         for i in $(seq 2 $TXQUEUES); do
                 QUEUE=$(($i - 1))
                 CCPU=$(($BASECPU + $QUEUE))
