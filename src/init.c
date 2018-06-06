@@ -78,6 +78,8 @@
 
 #include "main.h"
 
+uint16_t limitbw = 0;
+
 static struct rte_eth_conf port_conf = {
     .rxmode =
         {
@@ -337,6 +339,7 @@ static void app_init_nics (void) {
 				           ret);
 			}
 		}
+		float numqueues=0;
 
 		/* Init TX queues */
 		for (queue = 0; queue < APP_MAX_TX_QUEUES_PER_NIC_PORT; queue++) {
@@ -356,12 +359,18 @@ static void app_init_nics (void) {
 				           (unsigned)port,
 				           ret);
 			}
+			numqueues+=1; // I'm expecting that float sum error will be in our benefit
 		}
 
 		/* Start port */
 		ret = rte_eth_dev_start (port);
 		if (ret < 0) {
 			rte_panic ("Cannot start port %d (%d)\n", port, ret);
+		}
+
+		/* Limit TX queues */
+		if (limitbw>0){
+			rte_eth_set_queue_rate_limit(port,queue,limitbw/numqueues);
 		}
 	}
 

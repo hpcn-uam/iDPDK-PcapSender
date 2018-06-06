@@ -3,4 +3,4 @@
 	url = https://github.com/hpcn-uam/hptimelib
 [submodule "dpdk"]
 	path = dpdk
-	url = git://dpdk.org/dpdk
+	url = git://dpdk.org/dpdk-stable

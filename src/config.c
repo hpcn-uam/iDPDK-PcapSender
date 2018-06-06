@@ -85,7 +85,9 @@ static const char usage[] =
     "           handled by the I/O RX lcores                                        \n"
     "    --tx \"(PORT, QUEUE, LCORE), ...\" : List of NIC TX ports and queues       \n"
     "           handled by the I/O TX lcores                                        \n"
-    "    --pcap \"file.pcap\" : the pcap file to send   \n"
+    "    --pcap \"file.pcap\" : the pcap file to send                               \n"
+    "    --caida : the pcap is a caida file and requires special treatment          \n"
+    "    --bwl \"Mbps\" : limit the transfer to a fixed Mbps                        \n"
 
     "                                                                               \n"
     "Application optional parameters:                                               \n"
@@ -348,7 +350,8 @@ static int parse_arg_bsz (const char *arg) {
 #endif
 
 extern char pcap_File[256];
-extern uint8_t caidaTrace;
+extern uint8_t  caidaTrace;
+extern uint16_t limitbw;
 
 /* Parse the argument given in the command line of the application */
 int app_parse_args (int argc, char **argv) {
@@ -357,13 +360,14 @@ int app_parse_args (int argc, char **argv) {
 	int option_index;
 	char *prgname                 = argv[0];
 	static struct option lgopts[] = {// aniadido
-	                                 {"pcap", 1, 0, 0},
+	                                 {"pcap" , 1, 0, 0},
+	                                 {"caida", 0, 0, 0},
+	                                 {"bwl"  , 1, 0, 0},
 	                                 // normal
 	                                 {"rx", 1, 0, 0},
 	                                 {"tx", 1, 0, 0},
 	                                 {"rsz", 1, 0, 0},
 	                                 {"bsz", 1, 0, 0},
-	                                 {"caida", 0, 0, 0},
 	                                 {NULL, 0, 0, 0}};
 	uint32_t arg_rx     = 0;
 	uint32_t arg_tx     = 0;
@@ -414,6 +418,9 @@ int app_parse_args (int argc, char **argv) {
 				}
 				if (!strcmp (lgopts[option_index].name, "caida")) {
 					caidaTrace = 1;
+				}
+				if (!strcmp (lgopts[option_index].name, "bwl")) {
+					limitbw    = atoi(optarg);
 				}
 				break;
 

@@ -82,7 +82,7 @@
 #endif
 
 #ifndef APP_STATS
-#define APP_STATS 1000000
+#define APP_STATS 100000
 #endif
 
 #define APP_IO_RX_DROP_ALL_PACKETS 1
@@ -161,7 +161,7 @@ static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *lp,
 	uint8_t *data           = pointer + sizeof (pcaprec_hdr_tJZ);
 	int len                 = header->orig_len;
 	int caplen              = header->incl_len;
-	char *pktptr            = rte_ctrlmbuf_data (pkt);
+	char *pktptr            = rte_pktmbuf_mtod(pkt, char *);
 
 	if (caidaTrace) {
 		len += sizeof (ethernetHeader);  // 10; //añadir longitud eth truncada
@@ -177,8 +177,9 @@ static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *lp,
 
 	// move pointers
 	lp->tx.pcapfile_cur += caplen + sizeof (pcaprec_hdr_tJZ);
-	if (unlikely (lp->tx.pcapfile_cur == lp->tx.pcapfile_end))
+	if (unlikely (lp->tx.pcapfile_cur == lp->tx.pcapfile_end)){
 		lp->tx.pcapfile_cur = lp->tx.pcapfile_start;
+	}
 }
 
 static inline void app_fill_packets_frompcap (struct app_lcore_params_io *lp,
