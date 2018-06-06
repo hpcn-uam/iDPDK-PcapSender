@@ -5,7 +5,7 @@ TXQUEUES=1
 NICIFACE=0
 BASECPU=2
 
-if [ $# -gt 1 ]
+if [ $# -le 0 ]
     then echo "A pcap file should be provided to this script. Example: ./scripts/scriptname.sh file.pcap [num of queues]"
     exit 1
 fi
