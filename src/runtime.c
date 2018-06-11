@@ -210,8 +210,9 @@ static inline void app_fill_packets_frompcap (struct app_lcore_params_io *lp,
 			lastregion = 0;
 		} else if ((pos + REGIONMAX - REGIONMIN) > lastregion) {
 			// calc length
-			unsigned char *addr = lp->tx.pcapfile_start + (pos % REGIONPRE);
-			size_t length       = (addr + REGIONMAX > lp->tx.pcapfile_end)
+			unsigned char *addr =
+			    lp->tx.pcapfile_start + ((pos / REGIONPRE) * REGIONPRE) - sizeof (pcap_hdr_tJZ);
+			size_t length = (addr + REGIONMAX > lp->tx.pcapfile_end)
 			                    ? (size_t) (lp->tx.pcapfile_end - addr)
 			                    : REGIONMAX;
 
