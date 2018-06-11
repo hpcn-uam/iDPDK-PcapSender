@@ -35,10 +35,12 @@
 #include <getopt.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/queue.h>
 #include <sys/types.h>
 
@@ -63,7 +65,6 @@
 #include <rte_mempool.h>
 #include <rte_memzone.h>
 #include <rte_pci.h>
-#include <rte_per_lcore.h>
 #include <rte_per_lcore.h>
 #include <rte_prefetch.h>
 #include <rte_random.h>
@@ -131,6 +132,12 @@ char ethernetHeader[] = {
 
 //#define QUEUE_STATS
 
+// Prefetching mmap and atomics
+static unsigned long lastregion = 0;
+#define REGIONPRE (6 * 128 * 1024 * 1024ul)
+#define REGIONMIN (REGIONPRE / 1)
+#define REGIONMAX (REGIONPRE * 3)
+
 static inline void app_lcore_io_rx (struct app_lcore_params_io *lp, uint32_t bsz_rd) {
 	uint32_t i;
 
@@ -161,7 +168,7 @@ static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *lp,
 	uint8_t *data           = pointer + sizeof (pcaprec_hdr_tJZ);
 	int len                 = header->orig_len;
 	int caplen              = header->incl_len;
-	char *pktptr            = rte_pktmbuf_mtod(pkt, char *);
+	char *pktptr            = rte_pktmbuf_mtod (pkt, char *);
 
 	if (caidaTrace) {
 		len += sizeof (ethernetHeader);  // 10; //añadir longitud eth truncada
@@ -177,10 +184,17 @@ static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *lp,
 
 	// move pointers
 	lp->tx.pcapfile_cur += caplen + sizeof (pcaprec_hdr_tJZ);
-	if (unlikely (lp->tx.pcapfile_cur == lp->tx.pcapfile_end)){
+	if (unlikely (lp->tx.pcapfile_cur == lp->tx.pcapfile_end)) {
 		lp->tx.pcapfile_cur = lp->tx.pcapfile_start;
 	}
 }
+
+/*
+long lastregion=0;
+#define REGIONPRE (6*128*1024*1024l)
+#define REGIONMIN (REGIONPRE/1)
+#define REGIONMAX (REGIONPRE*3)
+*/
 
 static inline void app_fill_packets_frompcap (struct app_lcore_params_io *lp,
                                               uint8_t port_id,
@@ -189,6 +203,27 @@ static inline void app_fill_packets_frompcap (struct app_lcore_params_io *lp,
 	int i;
 	for (i = 0; i < nb_pkts; i++) {
 		app_fill_1packet_frompcap (lp, port_id, pkts[i]);
+	}
+	if (lp->tx.nic_queues[0].queue == 0) {
+		uint64_t pos = lp->tx.pcapfile_cur - lp->tx.pcapfile_start;
+		if (pos < REGIONMIN) {
+			lastregion = 0;
+		} else if ((pos + REGIONMAX - REGIONMIN) > lastregion) {
+			// calc length
+			unsigned char *addr = lp->tx.pcapfile_start + (pos % REGIONPRE);
+			size_t length       = (addr + REGIONMAX > lp->tx.pcapfile_end)
+			                    ? (size_t) (lp->tx.pcapfile_end - addr)
+			                    : REGIONMAX;
+
+			lastregion += length;
+
+			// do it
+			if (madvise (addr, length, MADV_WILLNEED)) {
+				perror ("madvise preload");
+			} else {
+				printf ("madvise preload executed (%lu - %lu)!\n", pos, length);
+			}
+		}
 	}
 }
 
@@ -270,8 +305,8 @@ static inline void app_lcore_io_tx (struct app_lcore_params_io *lp,
 					                       (start_ewr.tv_sec * 1000000. + start_ewr.tv_usec)) /
 					                      1000000.));
 
-					//rte_eth_stats_reset (port);
-					//lp->tx.start_ewr = end_ewr;  // Updating start
+					// rte_eth_stats_reset (port);
+					// lp->tx.start_ewr = end_ewr;  // Updating start
 				}
 
 				lp->tx.nic_queues_iters[i] = 0;
