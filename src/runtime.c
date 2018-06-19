@@ -168,7 +168,8 @@ static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *const 
                                               struct rte_mbuf *const restrict pkt) {
 #ifdef DONOTRESEND
 	unsigned muv;
-	for (muv = 0; muv < lp->tx.n_nic_queues; muv++) {
+	unsigned lim = numtxqueues % queue_id;
+	for (muv = 0; muv < numtxqueues; muv++) {
 #endif
 		// get pointers
 		uint8_t *pointer        = lp->tx.pcapfile_cur;
@@ -178,7 +179,7 @@ static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *const 
 		int caplen              = header->incl_len;
 
 #ifdef DONOTRESEND
-		if (muv == (numtxqueues % queue_id)) {
+		if (muv == lim) {
 #endif
 			char *pktptr = rte_pktmbuf_mtod (pkt, char *);
 
