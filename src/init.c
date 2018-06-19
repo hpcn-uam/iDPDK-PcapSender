@@ -68,7 +68,6 @@
 #include <rte_memzone.h>
 #include <rte_pci.h>
 #include <rte_per_lcore.h>
-#include <rte_per_lcore.h>
 #include <rte_prefetch.h>
 #include <rte_random.h>
 #include <rte_ring.h>
@@ -83,8 +82,8 @@ uint16_t limitbw = 0;
 static struct rte_eth_conf port_conf = {
     .rxmode =
         {
-            .mq_mode        = ETH_MQ_RX_RSS,
-            .max_rx_pkt_len = ETHER_MAX_LEN,//9000,  // ETHER_MAX_JUMBO_FRAME_LEN,
+            .mq_mode = ETH_MQ_RX_RSS,
+            .max_rx_pkt_len = ETHER_MAX_LEN,  // 9000,  // ETHER_MAX_JUMBO_FRAME_LEN,
             .split_hdr_size = 0,
             .header_split   = 0, /**< Header Split disabled */
             .hw_ip_checksum = 0,
@@ -98,7 +97,8 @@ static struct rte_eth_conf port_conf = {
         {
             .rss_conf =
                 {
-                    .rss_key = NULL, .rss_hf = ETH_RSS_IP,
+                    .rss_key = NULL,
+                    .rss_hf  = ETH_RSS_IP,
                 },
         },
     .txmode =
@@ -173,7 +173,7 @@ static void app_init_rings_tx (void) {
 	unsigned lcore;
 
 	/*Memory Node*/
-	unsigned long nodemask = 1 << 0;//rte_lcore_to_socket_id (lcore);
+	unsigned long nodemask = 1 << 0;  // rte_lcore_to_socket_id (lcore);
 	int ret                = set_mempolicy (MPOL_BIND, &nodemask, sizeof (nodemask) * 8);
 	printf ("Binding mmap memory (mask: %016lx) => %d\n", nodemask, ret);
 
@@ -225,7 +225,7 @@ static void app_init_rings_tx (void) {
 			}
 			/*SetUp memory for current node*/
 			struct app_lcore_params_io *lp_io = &app.lcore_params[lcore].io;
-			lp_io->tx.pcapfile_start = pcapfile_start;
+			lp_io->tx.pcapfile_start          = pcapfile_start;
 
 			lp_io->tx.pcapfile_end = lp_io->tx.pcapfile_start + sb.st_size;
 			lp_io->tx.pcapfile_start += sizeof (pcap_hdr_tJZ);
@@ -339,7 +339,7 @@ static void app_init_nics (void) {
 				           ret);
 			}
 		}
-		float numqueues=0;
+		float numqueues = 0;
 
 		/* Init TX queues */
 		for (queue = 0; queue < APP_MAX_TX_QUEUES_PER_NIC_PORT; queue++) {
@@ -359,7 +359,7 @@ static void app_init_nics (void) {
 				           (unsigned)port,
 				           ret);
 			}
-			numqueues+=1; // I'm expecting that float sum error will be in our benefit
+			numqueues += 1;  // I'm expecting that float sum error will be in our benefit
 		}
 
 		/* Start port */
@@ -369,8 +369,15 @@ static void app_init_nics (void) {
 		}
 
 		/* Limit TX queues */
-		if (limitbw>0){
-			rte_eth_set_queue_rate_limit(port,queue,limitbw/numqueues);
+		if (limitbw > 0) {
+			for (queue = 0; queue < numqueues; queue++) {
+				printf ("***** Seting rate limit %d/%d to: %hu ****\n",
+				        port,
+				        queue,
+				        (uint16_t) (limitbw / numqueues));
+
+				rte_eth_set_queue_rate_limit (port, queue, limitbw / numqueues);
+			}
 		}
 	}
 

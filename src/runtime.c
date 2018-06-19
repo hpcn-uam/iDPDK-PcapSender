@@ -159,34 +159,52 @@ static inline void app_lcore_io_rx (struct app_lcore_params_io *lp, uint32_t bsz
 	}
 }
 
-static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *lp,
-                                              uint8_t port_id,
-                                              struct rte_mbuf *pkt) {
-	// get pointers
-	uint8_t *pointer        = lp->tx.pcapfile_cur;
-	pcaprec_hdr_tJZ *header = (pcaprec_hdr_tJZ *)pointer;
-	uint8_t *data           = pointer + sizeof (pcaprec_hdr_tJZ);
-	int len                 = header->orig_len;
-	int caplen              = header->incl_len;
-	char *pktptr            = rte_pktmbuf_mtod (pkt, char *);
+#define DONOTRESEND
+static __thread unsigned numtxqueues = 0;
 
-	if (caidaTrace) {
-		len += sizeof (ethernetHeader);  // 10; //añadir longitud eth truncada
-		rte_memcpy (pktptr, ethernetHeader, sizeof (ethernetHeader));
-		pktptr += sizeof (ethernetHeader);
+static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *const restrict lp,
+                                              const uint8_t port_id,
+                                              const uint8_t queue_id,
+                                              struct rte_mbuf *const restrict pkt) {
+#ifdef DONOTRESEND
+	unsigned muv;
+	for (muv = 0; muv < lp->tx.n_nic_queues; muv++) {
+#endif
+		// get pointers
+		uint8_t *pointer        = lp->tx.pcapfile_cur;
+		pcaprec_hdr_tJZ *header = (pcaprec_hdr_tJZ *)pointer;
+		uint8_t *data           = pointer + sizeof (pcaprec_hdr_tJZ);
+		int len                 = header->orig_len;
+		int caplen              = header->incl_len;
+
+#ifdef DONOTRESEND
+		if (muv != numtxqueues % queue_id) {
+#endif
+			char *pktptr = rte_pktmbuf_mtod (pkt, char *);
+
+			if (caidaTrace) {
+				len += sizeof (ethernetHeader);  // 10; //añadir longitud eth truncada
+				rte_memcpy (pktptr, ethernetHeader, sizeof (ethernetHeader));
+				pktptr += sizeof (ethernetHeader);
+			}
+
+			// copy data
+			pkt->pkt_len  = len;
+			pkt->data_len = len;
+			pkt->port     = port_id;
+			rte_memcpy (pktptr, data, caplen);
+
+#ifdef DONOTRESEND
+		}
+#endif
+		// move pointers
+		lp->tx.pcapfile_cur += caplen + sizeof (pcaprec_hdr_tJZ);
+		if (unlikely (lp->tx.pcapfile_cur == lp->tx.pcapfile_end)) {
+			lp->tx.pcapfile_cur = lp->tx.pcapfile_start;
+		}
+#ifdef DONOTRESEND
 	}
-
-	// copy data
-	pkt->pkt_len  = len;
-	pkt->data_len = len;
-	pkt->port     = port_id;
-	rte_memcpy (pktptr, data, caplen);
-
-	// move pointers
-	lp->tx.pcapfile_cur += caplen + sizeof (pcaprec_hdr_tJZ);
-	if (unlikely (lp->tx.pcapfile_cur == lp->tx.pcapfile_end)) {
-		lp->tx.pcapfile_cur = lp->tx.pcapfile_start;
-	}
+#endif
 }
 
 /*
@@ -196,13 +214,14 @@ long lastregion=0;
 #define REGIONMAX (REGIONPRE*3)
 */
 
-static inline void app_fill_packets_frompcap (struct app_lcore_params_io *lp,
-                                              uint8_t port_id,
-                                              struct rte_mbuf **pkts,
+static inline void app_fill_packets_frompcap (struct app_lcore_params_io *const restrict lp,
+                                              const uint8_t port_id,
+                                              const uint8_t queue_id,
+                                              struct rte_mbuf *const restrict *const restrict pkts,
                                               const uint16_t nb_pkts) {
 	int i;
 	for (i = 0; i < nb_pkts; i++) {
-		app_fill_1packet_frompcap (lp, port_id, pkts[i]);
+		app_fill_1packet_frompcap (lp, port_id, queue_id, pkts[i]);
 	}
 	if (lp->tx.nic_queues[0].queue == 0) {
 		uint64_t pos = lp->tx.pcapfile_cur - lp->tx.pcapfile_start;
@@ -221,8 +240,6 @@ static inline void app_fill_packets_frompcap (struct app_lcore_params_io *lp,
 			// do it
 			if (madvise (addr, length, MADV_WILLNEED)) {
 				perror ("madvise preload");
-			} else {
-				printf ("madvise preload executed (%lu - %lu)!\n", pos, length);
 			}
 		}
 	}
@@ -258,7 +275,7 @@ static inline void app_lcore_io_tx (struct app_lcore_params_io *lp,
 			if (rte_pktmbuf_alloc_bulk (app.pools[0], lp->tx.mbuf_out[port].array, bsz_wr))
 				continue;  // error
 
-			app_fill_packets_frompcap (lp, port, lp->tx.mbuf_out[port].array, bsz_wr);
+			app_fill_packets_frompcap (lp, port, queue, lp->tx.mbuf_out[port].array, bsz_wr);
 
 			/*if (unlikely(n_mbufs < bsz_wr)) {
 			    lp->tx.mbuf_out[port].n_mbufs = n_mbufs;
@@ -323,6 +340,7 @@ static void app_lcore_main_loop_io (void) {
 	struct app_lcore_params_io *lp = &app.lcore_params[lcore].io;
 	uint64_t i                     = 0;
 
+	numtxqueues = app_get_nic_tx_queues_per_port (lp->tx.nic_queues[0].port);
 	gettimeofday (&lp->tx.start_ewr, NULL);
 
 	for (;;) {

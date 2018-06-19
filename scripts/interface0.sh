@@ -30,7 +30,7 @@ fi
 git submodule update --init # updates dependencies
 cd src
 make && \
-        build/app/hpcn_pcapreplay -c FF -n 6 -- --rx "(0,0,1)" --tx "$TXPARAM" \
+        build/app/hpcn_pcapreplay -c FF -n 6 -- --rx "($NICIFACE,0,$BASECPU)" --tx "$TXPARAM" \
                 --rsz "1024, 1024" \
                 --bsz "144, 144" \
 		--pcap "$1"
