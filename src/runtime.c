@@ -160,7 +160,7 @@ static inline void app_lcore_io_rx (struct app_lcore_params_io *lp, uint32_t bsz
 }
 
 #define DONOTRESEND
-static __thread unsigned numtxqueues = 0;
+static __thread uint8_t numtxqueues = 0;
 
 static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *const restrict lp,
                                               const uint8_t port_id,
@@ -178,7 +178,7 @@ static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *const 
 		int caplen              = header->incl_len;
 
 #ifdef DONOTRESEND
-		if (muv != numtxqueues % queue_id) {
+		if (muv == (numtxqueues % queue_id)) {
 #endif
 			char *pktptr = rte_pktmbuf_mtod (pkt, char *);
 
