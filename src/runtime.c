@@ -168,7 +168,7 @@ static inline void app_fill_1packet_frompcap (struct app_lcore_params_io *const 
                                               struct rte_mbuf *const restrict pkt) {
 #ifdef DONOTRESEND
 	unsigned muv;
-	unsigned lim = numtxqueues % queue_id;
+	unsigned lim = queue_id % numtxqueues;
 	for (muv = 0; muv < numtxqueues; muv++) {
 #endif
 		// get pointers
