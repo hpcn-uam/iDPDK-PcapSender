@@ -9,7 +9,7 @@ This program allows to send PCAPS preloaded in memory (much biggers than other t
 Compilation
 =================
 The program can be easly compiled using the makefile provided.
-It needs (as anyother DPDK app) the DPDK enviromental variables such as *RTE_SDK* to be defined first.
+It needs (as anyother DPDK app) DPDK(20.11) installed in the host.
 
 Execution
 =================

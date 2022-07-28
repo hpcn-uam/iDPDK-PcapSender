@@ -83,15 +83,15 @@ static struct rte_eth_conf port_conf = {
     .rxmode =
         {
             .mq_mode = ETH_MQ_RX_RSS,
-            .max_rx_pkt_len = ETHER_MAX_LEN,  // 9000,  // ETHER_MAX_JUMBO_FRAME_LEN,
+            .max_rx_pkt_len = RTE_ETHER_MAX_LEN,  // 9000,  // ETHER_MAX_JUMBO_FRAME_LEN,
             .split_hdr_size = 0,
-            .header_split   = 0, /**< Header Split disabled */
-            .hw_ip_checksum = 0,
+            // .header_split   = 0, /**< Header Split disabled */
+            // .hw_ip_checksum = 0,
             /**< IP checksum offload enabled */  // DISABLED!
-            .hw_vlan_filter = 0,                 /**< VLAN filtering disabled */
-            .jumbo_frame    = 1,
+            // .hw_vlan_filter = 0,                 /**< VLAN filtering disabled */
+            // .jumbo_frame    = 1,
             /**< Jumbo Frame Support disabled */  // ENABLED!
-            .hw_strip_crc = 0,                    /**< CRC stripped by hardware */
+            // .hw_strip_crc = 0,                    /**< CRC stripped by hardware */
         },
     .rx_adv_conf =
         {
@@ -235,7 +235,7 @@ static void app_init_rings_tx (void) {
 }
 
 /* Check the link status of all ports in up to 9s, and print them finally */
-static void check_all_ports_link_status (uint8_t port_num, uint32_t port_mask) {
+static void check_all_ports_link_status (uint32_t port_num, uint32_t port_mask) {
 #define CHECK_INTERVAL 100 /* 100ms */
 #define MAX_CHECK_TIME 90  /* 9s (90 * 100ms) in total */
 	uint8_t portid, count, all_ports_up, print_flag = 0;
